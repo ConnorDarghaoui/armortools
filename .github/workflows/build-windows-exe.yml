@@ -1,0 +1,45 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+
+jobs:
+  win64:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Compile ArmorPaint (Release x64)
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          cd paint
+          ..\base\make --compile
+
+      - name: Package runnable folder
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+
+          $outDir = "paint/build/out"
+          $exe = Join-Path $outDir "ArmorPaint.exe"
+
+          if (-not (Test-Path $exe)) {
+            throw "No executable found at $exe"
+          }
+
+          Compress-Archive -Path "$outDir\*" -DestinationPath "ArmorPaint-win64.zip" -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArmorPaint-win64
+          path: ArmorPaint-win64.zip
+          if-no-files-found: error
