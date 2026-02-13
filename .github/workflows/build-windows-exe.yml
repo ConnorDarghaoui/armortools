@@ -2,9 +2,18 @@ name: Build Windows EXE
 
 on:
   workflow_dispatch:
+    inputs:
+      create_release:
+        description: "Create GitHub release using latest upstream version tag"
+        required: false
+        type: boolean
+        default: false
   push:
     branches:
       - main
+
+permissions:
+  contents: write
 
 jobs:
   win64:
@@ -46,3 +55,37 @@ jobs:
           name: ArmorPaint-win64
           path: ArmorPaint-win64.zip
           if-no-files-found: error
+
+      - name: Resolve upstream latest release tag
+        if: github.event_name == 'workflow_dispatch' && inputs.create_release == true
+        id: upstream_tag
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          $headers = @{ "User-Agent" = "github-actions" }
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/armory3d/armortools/releases/latest" -Headers $headers
+          if (-not $release.tag_name) {
+            throw "Could not determine upstream release tag."
+          }
+          "tag=$($release.tag_name)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Create or update release in fork
+        if: github.event_name == 'workflow_dispatch' && inputs.create_release == true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          UPSTREAM_TAG: ${{ steps.upstream_tag.outputs.tag }}
+        run: |
+          Set-StrictMode -Version Latest
+          if (-not $env:UPSTREAM_TAG) {
+            throw "UPSTREAM_TAG is empty."
+          }
+
+          gh release view $env:UPSTREAM_TAG --repo $env:REPO *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:UPSTREAM_TAG "ArmorPaint-win64.zip" --repo $env:REPO --clobber
+          }
+          else {
+            gh release create $env:UPSTREAM_TAG "ArmorPaint-win64.zip" --repo $env:REPO --title "ArmorPaint $env:UPSTREAM_TAG" --generate-notes
+          }
