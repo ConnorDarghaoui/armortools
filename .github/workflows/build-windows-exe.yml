@@ -2,12 +2,6 @@ name: Build Windows EXE
 
 on:
   workflow_dispatch:
-    inputs:
-      create_release:
-        description: "Create GitHub release using latest upstream version tag"
-        required: false
-        type: boolean
-        default: false
   push:
     branches:
       - main
@@ -57,7 +51,6 @@ jobs:
           if-no-files-found: error
 
       - name: Resolve upstream latest release tag
-        if: github.event_name == 'workflow_dispatch' && inputs.create_release == true
         id: upstream_tag
         shell: pwsh
         run: |
@@ -70,7 +63,6 @@ jobs:
           "tag=$($release.tag_name)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Create or update release in fork
-        if: github.event_name == 'workflow_dispatch' && inputs.create_release == true
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
